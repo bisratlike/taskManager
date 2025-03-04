@@ -1,6 +1,6 @@
 import {pgTable , serial , text ,timestamp ,pgEnum} from "drizzle-orm/pg-core";
 export const taskStatus = pgEnum("task_status",["pending","completed","in_progress"]);
-export const Tasks = pgTable("users",{
+export const tasks = pgTable("users",{
     id:serial("id").primaryKey(),
     title:text("title"),
     description:text("description"),

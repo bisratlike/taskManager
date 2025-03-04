@@ -63,8 +63,8 @@ export async function getTasks() {
     try{
 
         const allTasks = await db.select().from(tasks).orderBy(asc(tasks.id));
-
-        return allTasks;
+       
+        return allTasks|| []; ;
 
     }catch(error){
 

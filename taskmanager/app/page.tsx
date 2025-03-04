@@ -1,12 +1,14 @@
+"use client";
 import Header from '../components/Header';
-import '../app/globals.css';
 import TaskPage from './tasks/page';
-import React from 'react';
+
 export default function Home() {
   return (
-    <div><Header />
-    <TaskPage/>
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      <main className="p-4 max-w-4xl mx-auto">
+      <TaskPage/>
+      </main>
     </div>
-    
   );
 }

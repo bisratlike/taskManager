@@ -1,0 +1,519 @@
+--- File: app/layout.tsx ---
+"use client";
+import { MantineProvider } from "@mantine/core";
+import { Notifications } from "@mantine/notifications";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <MantineProvider>
+          <Notifications />
+          {children}
+        </MantineProvider>
+      </body>
+    </html>
+  );
+}
+
+--- File: app/page.tsx ---
+"use client";
+import Header from '../components/Header';
+import TaskPage from './tasks/page';
+
+export default function Home() {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      <main className="p-4 max-w-4xl mx-auto">
+      <TaskPage/>
+      </main>
+    </div>
+  );
+}
+
+--- File: app/tasks/page.tsx ---
+"use client";
+import { useEffect, useReducer, useState } from 'react';
+import AddModal from './components/addModal';
+import TaskList from './components/taskList';
+import TaskControls from './components/taskControl';
+import { TaskStatus } from './components/addModal';
+import { Task } from './components/types'; 
+
+type State = {
+  tasks: Task[];
+  past: Task[][];
+  future: Task[][];
+};
+
+type Action =
+  | { type: 'ADD_TASK'; task: Task }
+  | { type: 'REMOVE_TASK'; id: number }
+  | { type: 'EDIT_TASK'; task: Task }
+  | { type: 'UNDO' }
+  | { type: 'REDO' };
+
+const initialState: State = {
+  tasks: [],
+  past: [],
+  future: [],
+};
+
+const reducer = (state: State, action: Action): State => {
+  switch (action.type) {
+    
+      case 'EDIT_TASK': {
+        const newTasks = state.tasks.map(task => 
+          task.id === action.task.id ? action.task : task
+        );
+        return {
+          tasks: newTasks,
+          past: [...state.past, state.tasks],
+          future: [],
+        };
+      }
+    case 'ADD_TASK': {
+      const newPast = [...state.past, state.tasks];
+      return {
+        tasks: [...state.tasks, action.task],
+        past: newPast,
+        future: [],
+      };
+    }
+    case 'REMOVE_TASK': {
+      const newTasks = state.tasks.filter(task => task.id !== action.id);
+      const newPast = [...state.past, state.tasks];
+      return {
+        tasks: newTasks,
+        past: newPast,
+        future: [],
+      };
+    }
+    case 'UNDO': {
+      if (state.past.length === 0) return state;
+      const previousTasks = state.past[state.past.length - 1];
+      const newPast = state.past.slice(0, state.past.length - 1);
+      return {
+        tasks: previousTasks,
+        past: newPast,
+        future: [state.tasks, ...state.future],
+      };
+    }
+    case 'REDO': {
+      if (state.future.length === 0) return state;
+      const nextTasks = state.future[0];
+      const newFuture = state.future.slice(1);
+      return {
+        tasks: nextTasks,
+        past: [...state.past, state.tasks],
+        future: newFuture,
+      };
+    }
+    default:
+      return state;
+  }
+};
+
+// Helper functions for Date serialization
+const replacer = (key: string, value: any) => {
+  if (value instanceof Date) return { __type: 'Date', value: value.toISOString() };
+  return value;
+};
+
+const reviver = (key: string, value: any) => {
+  if (value?.__type === 'Date') return new Date(value.value);
+  return value;
+};
+
+type TaskPageProps = {
+  initialTasks: Task[];
+};
+
+export default function TaskPage({ initialTasks }: TaskPageProps) {
+  const [state, dispatch] = useReducer(reducer, {
+    ...initialState,
+    tasks: initialTasks,
+  }, () => {
+    if (typeof window === 'undefined') return initialState;
+    
+    const saved = localStorage.getItem('taskState');
+    return saved ? JSON.parse(saved, reviver) : initialState;
+  });
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Persist state to localStorage
+  useEffect(() => {
+    localStorage.setItem('taskState', JSON.stringify(state, replacer));
+  }, [state]);
+
+  const handleSave = (title: string, description: string, status: TaskStatus, dueDate: Date) => {
+    const newTask = { id: Date.now(), title, description, status, dueDate };
+    dispatch({ type: 'ADD_TASK', task: newTask });
+    setIsModalOpen(false);
+  };
+
+  return (
+    <div>
+      <TaskList tasks={state.tasks} onDelete={(id) => dispatch({ type: 'REMOVE_TASK', id })} />
+      <TaskControls
+        onAdd={() => setIsModalOpen(true)}
+        onUndo={() => dispatch({ type: 'UNDO' })}
+        onRedo={() => dispatch({ type: 'REDO' })}
+      />
+      <AddModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSave} />
+    </div>
+  );
+}
+
+--- File: app/tasks/components/addModal.tsx ---
+import React, { useState } from 'react';
+import { Modal, Button, TextInput, Select } from '@mantine/core';
+
+export enum TaskStatus {
+  Pending = "pending",
+  Completed = "completed",
+  InProgress = "in_progress"
+}
+
+type AddModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (title: string, description: string, status: TaskStatus, dueDate: Date) => void;
+};
+
+const AddModal: React.FC<AddModalProps> = ({ isOpen, onClose, onSave }) => {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [status, setStatus] = useState<TaskStatus>(TaskStatus.Pending);
+  const [dueDate, setDueDate] = useState<Date | null>(null);
+
+  const handleSave = () => {
+    if (dueDate) {
+      onSave(title, description, status, dueDate);
+      onClose();
+    }
+  };
+
+  return (
+    <Modal opened={isOpen} onClose={onClose} title="Add New Task">
+      <TextInput
+        label="Title"
+        value={title}
+        onChange={(event) => setTitle(event.currentTarget.value)}
+      />
+      <TextInput
+        label="Description"
+        value={description}
+        onChange={(event) => setDescription(event.currentTarget.value)}
+      />
+      <Select
+        label="Status"
+        value={status}
+        onChange={(value) => setStatus(value as TaskStatus)}
+        data={[
+          { value: TaskStatus.Pending, label: 'Pending' },
+          { value: TaskStatus.Completed, label: 'Completed' },
+          { value: TaskStatus.InProgress, label: 'In Progress' },
+        ]}
+      />
+      <TextInput
+        label="Due Date"
+        type="date"
+        value={dueDate ? dueDate.toISOString().split('T')[0] : ''}
+        onChange={(event) => setDueDate(new Date(event.currentTarget.value))}
+      />
+      <Button onClick={handleSave}>Save</Button>
+    </Modal>
+  );
+};
+
+export default AddModal;
+
+--- File: app/tasks/components/editModal.tsx ---
+import React from 'react';
+import { Modal, Button, TextInput, Select } from '@mantine/core';
+import { TaskStatus } from './addModal';
+import { Task } from './types';
+
+type EditModalProps = {
+  task: Task | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (task: Task) => void;
+};
+
+const EditModal: React.FC<EditModalProps> = ({ task, isOpen, onClose, onSave }) => {
+  const [form, setForm] = React.useState({
+    title: '',
+    description: '',
+    status: TaskStatus.Pending,
+    dueDate: new Date(),
+  });
+
+  React.useEffect(() => {
+    if (task) {
+      setForm({
+        title: task.title,
+        description: task.description,
+        status: task.status as TaskStatus,
+        dueDate: new Date(task.dueDate),
+      });
+    }
+  }, [task]);
+
+  const handleSave = () => {
+    if (!form.title || !form.dueDate) return;
+    onSave({
+      ...task!,
+      ...form,
+      dueDate: form.dueDate,
+    });
+  };
+
+  return (
+    <Modal opened={isOpen} onClose={onClose} title="Edit Task">
+      <TextInput
+        label="Title"
+        value={form.title}
+        onChange={(event) => setForm({ ...form, title: event.currentTarget.value })}
+      />
+      <TextInput
+        label="Description"
+        value={form.description}
+        onChange={(event) => setForm({ ...form, description: event.currentTarget.value })}
+      />
+      <Select
+        label="Status"
+        value={form.status}
+        onChange={(value) => setForm({ ...form, status: value as TaskStatus })}
+        data={[
+          { value: TaskStatus.Pending, label: 'Pending' },
+          { value: TaskStatus.Completed, label: 'Completed' },
+          { value: TaskStatus.InProgress, label: 'In Progress' },
+        ]}
+      />
+      <TextInput
+        label="Due Date"
+        type="date"
+        value={form.dueDate ? form.dueDate.toISOString().split('T')[0] : ''}
+        onChange={(event) => setForm({ ...form, dueDate: new Date(event.currentTarget.value) })}
+      />
+      <Button onClick={handleSave}>Save</Button>
+    </Modal>
+  );
+};
+
+export default EditModal;
+
+--- File: app/tasks/components/taskControl.tsx ---
+// app/tasks/components/TaskControls.tsx
+import React from 'react';
+import { Button } from '@mantine/core';
+
+type TaskControlsProps = {
+  onAdd: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+};
+
+
+
+const TaskControls: React.FC<TaskControlsProps> = ({ 
+  onAdd, onUndo, onRedo, canUndo, canRedo 
+}) => (
+  <div className="flex gap-2 mb-4">
+    <Button onClick={onAdd} color="blue">Add Task</Button>
+    <Button onClick={onUndo} color="yellow" disabled={!canUndo}>Undo</Button>
+    <Button onClick={onRedo} color="green" disabled={!canRedo}>Redo</Button>
+  </div>
+);
+
+export default TaskControls;
+
+--- File: app/tasks/components/types.ts ---
+// app/tasks/components/types.ts
+export type Task = {
+    id: number;
+    title: string;
+    description: string;
+    status: string; 
+    dueDate: Date;
+  };
+
+--- File: app/tasks/components/actions.ts ---
+
+"use server";
+import {db} from "@/drizzle/db";
+import {tasks} from "@/drizzle/schema";
+import { eq, asc } from "drizzle-orm";
+// import { sql } from "drizzle-orm";
+
+
+export async function createTask(title: string, description: string, dueDate: Date, status: "pending" | "completed" | "in_progress" = "pending") {
+
+    try{
+
+        const [newTask]= await db.insert(tasks).values({
+            title,
+            description,
+            dueDate,
+            status, 
+        }).returning();
+        return newTask;
+      
+    
+
+    }catch(error){
+
+    console.log("error on creating task",error)
+    }
+
+}
+
+export async function updateTask(id: number, title: string, description: string, dueDate: Date, status: "pending" | "completed" | "in_progress") {
+
+    try{
+
+        const [updatedTask]= await db.update(tasks).set({
+            title,
+            description,
+            dueDate,
+            status
+        }).where(eq(tasks.id, id)).returning();
+
+        return updatedTask;
+
+    }catch(error){
+
+        console.log("error on updating task",error)
+    }
+}
+
+export async function deleteTask(id: number) {
+    try{
+
+        const [deletedTask]= await db.delete(tasks).where(eq(tasks.id, id)).returning();
+        return deletedTask;
+
+    }catch(error){
+
+        console.log("error on deleting task",error)
+    }
+}
+
+
+export async function getTasks() {
+    try{
+
+        const allTasks = await db.select().from(tasks).orderBy(asc(tasks.id));
+       
+        return allTasks|| []; ;
+
+    }catch(error){
+
+        console.log("error on getting tasks",error)
+    }
+}
+
+--- File: app/tasks/components/taskList.tsx ---
+// app/tasks/components/TaskList.tsx
+import React from 'react';
+import { Button } from '@mantine/core';
+import {Task}  from './types'; 
+
+import { useState } from 'react';
+import EditModal from './editModal';
+
+type TaskListProps = {
+  tasks: Task[];
+  onDelete: (id: number) => void;
+  onEdit: (task: Task) => void;
+};
+
+const TaskList: React.FC<TaskListProps> = ({ tasks, onDelete, onEdit }) => {
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  return (
+    <div className="space-y-4">
+      {tasks.map((task) => (
+        <div key={task.id} className="p-4 bg-white rounded shadow">
+          <h2 className="font-bold text-lg">{task.title}</h2>
+          <p className="text-gray-600">{task.description}</p>
+          <div className="flex items-center gap-2 mt-2">
+            <span className={`px-2 py-1 rounded text-sm ${
+              task.status === "completed"? 'bg-green-100 text-green-800' :
+              task.status === "in_progress" ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'
+            }`}>
+              {task.status}
+            </span>
+            <span className="text-sm text-gray-500">
+              Due: {task.dueDate.toLocaleDateString()}
+            </span>
+          </div>
+          <div className="mt-2 flex gap-2">
+            <Button size="sm" onClick={() => onEdit(task)}>Edit</Button>
+            <Button size="sm" color="red" onClick={() => onDelete(task.id)}>
+              Delete
+            </Button>
+          </div>
+        </div>
+      ))}
+      
+      <EditModal
+        task={editingTask}
+        isOpen={Boolean(editingTask)}
+        onClose={() => setEditingTask(null)}
+        onSave={(updated) => {
+          onEdit(updated);
+          setEditingTask(null);
+        }}
+      />
+    </div>
+  );
+};
+
+export default TaskList;
+
+
+
+--- File: components/Header.tsx ---
+import React from "react";
+
+// import {Button , Container } from "@mantine/core";
+export default function Header() {
+    return (
+        <header className="w-full bg-purple-500 p-4 ">
+           
+            <h1 className="text-white text-2xl font-bold center">Task Manager</h1>
+           
+        
+
+        </header>
+        
+    );
+}
+
+--- File: drizzle/db.ts ---
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import * as schema from "./schema";
+const client = postgres(process.env.DATABASE_URL!);
+export const db = drizzle(client, { schema });
+
+--- File: drizzle/schema.ts ---
+import {pgTable , serial , text ,timestamp ,pgEnum} from "drizzle-orm/pg-core";
+export const taskStatus = pgEnum("task_status",["pending","completed","in_progress"]);
+export const tasks = pgTable("tasks",{
+    id:serial("id").primaryKey(),
+    title:text("title"),
+    description:text("description"),
+    status:taskStatus("status").default("pending"),
+    dueDate:timestamp("due_date"),
+    createdAt:timestamp("created_at").defaultNow(),
+    updatedAt:timestamp("updated_at").defaultNow()
+})
+

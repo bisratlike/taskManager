@@ -15,7 +15,7 @@ A modern task management web app with time-travel capabilities built using Next.
 
 1. Clone repo
 ```bash
-git clone https://github.com/yourusername/task-manager.git
+git clone https://github.com/bisratlike/task-manager.git
 
     Install dependencies
 
@@ -27,8 +27,8 @@ npm install
 
 
 
-cp .env.example .env.local
-# Update DATABASE_URL in .env.local
+.env.local
+#  DATABASE_URL in .env.local
 
     Database setup
 

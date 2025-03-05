@@ -11,6 +11,9 @@ A modern task management web app with time-travel capabilities built using Next.
 - 💾 **Persistent Storage** - LocalState + PostgreSQL integration
 - 🎨 **Modern UI** - Powered by Mantine design system
 
+
+
+![Screenshot](./taskmanager/public/pre.png)
 ## Installation
 
 1. Clone repo

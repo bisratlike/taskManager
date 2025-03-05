@@ -1,74 +1,93 @@
-import React from 'react';
-import { Modal, Button, TextInput, Select } from '@mantine/core';
-import { TaskStatus } from './addModal';
-import { Task } from './types';
+// app/tasks/components/editModal.tsx
+"use client";
+import { Modal, TextInput, Select, Button } from '@mantine/core';
+import { DateInput } from '@mantine/dates';
+import { useForm } from '@mantine/form';
+import { useEffect } from 'react';
+import { Task, TaskStatus } from './types';
 
-type EditModalProps = {
+export default function EditModal({ task, opened, onClose, onSubmit }: {
   task: Task | null;
-  isOpen: boolean;
+  opened: boolean;
   onClose: () => void;
-  onSave: (task: Task) => void;
-};
-
-const EditModal: React.FC<EditModalProps> = ({ task, isOpen, onClose, onSave }) => {
-    const [form, setForm] = React.useState({
+  onSubmit: (task: Task) => void;
+}) {
+  const form = useForm({
+    initialValues: {
       title: '',
       description: '',
       status: TaskStatus.Pending,
-      dueDate: new Date(), // Initialize with current date
-    });
-  
-    React.useEffect(() => {
-      if (task) {
-        setForm({
-          title: task.title,
-          description: task.description,
-          status: task.status as TaskStatus,
-          dueDate: new Date(task.dueDate), // Ensure Date object
-        });
-      }
-    }, [task]);
+      dueDate: null as Date | null,
+    },
+    validate: {
+      title: (value) => (value.trim().length > 0 ? null : 'Title is required'),
+      dueDate: (value) => (value ? null : 'Due date is required'),
+    },
+  });
 
-  const handleSave = () => {
-    if (!form.title || !form.dueDate) return;
-    onSave({
+  useEffect(() => {
+    if (task) {
+      form.setValues({
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        dueDate: task.dueDate instanceof Date ? task.dueDate : new Date(task.dueDate)
+      });
+    }
+  }, [task]);
+
+  const handleSubmit = (values: typeof form.values) => {
+    if (!values.dueDate) return;
+    
+    onSubmit({
       ...task!,
-      ...form,
-      dueDate: form.dueDate,
+      ...values,
+      dueDate: values.dueDate
     });
+    onClose();
   };
 
   return (
-    <Modal opened={isOpen} onClose={onClose} title="Edit Task">
-      <TextInput
-        label="Title"
-        value={form.title}
-        onChange={(event) => setForm({ ...form, title: event.currentTarget.value })}
-      />
-      <TextInput
-        label="Description"
-        value={form.description}
-        onChange={(event) => setForm({ ...form, description: event.currentTarget.value })}
-      />
-      <Select
-        label="Status"
-        value={form.status}
-        onChange={(value) => setForm({ ...form, status: value as TaskStatus })}
-        data={[
-          { value: TaskStatus.Pending, label: 'Pending' },
-          { value: TaskStatus.Completed, label: 'Completed' },
-          { value: TaskStatus.InProgress, label: 'In Progress' },
-        ]}
-      />
-      <TextInput
-        label="Due Date"
-        type="date"
-        value={form.dueDate ? form.dueDate.toISOString().split('T')[0] : ''}
-        onChange={(event) => setForm({ ...form, dueDate: new Date(event.currentTarget.value) })}
-      />
-      <Button onClick={handleSave}>Save</Button>
+    <Modal opened={opened} onClose={onClose} title="Edit Task" centered>
+      <form onSubmit={form.onSubmit(handleSubmit)}>
+        <TextInput
+          label="Title"
+          withAsterisk
+          {...form.getInputProps('title')}
+          mb="sm"
+        />
+
+        <TextInput
+          label="Description"
+          {...form.getInputProps('description')}
+          mb="sm"
+        />
+
+        <Select
+          label="Status"
+          data={[
+            { value: TaskStatus.Pending, label: 'Pending' },
+            { value: TaskStatus.Completed, label: 'Completed' },
+            { value: TaskStatus.InProgress, label: 'In Progress' },
+          ]}
+          {...form.getInputProps('status')}
+          mb="sm"
+        />
+
+        <DateInput
+          label="Due Date"
+          value={form.values.dueDate}
+          onChange={(date) => form.setFieldValue('dueDate', date)}
+          minDate={new Date()}
+          withAsterisk
+          mb="md"
+          popoverProps={{ withinPortal: true }}
+        />
+
+        <Button type="submit" fullWidth>
+          Save Changes
+        </Button>
+      </form>
     </Modal>
   );
-};
-
-export default EditModal;
+}

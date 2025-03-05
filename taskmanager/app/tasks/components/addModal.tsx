@@ -1,60 +1,96 @@
-import React, { useState } from 'react';
-import { Modal, Button, TextInput, Select } from '@mantine/core';
+// app/tasks/components/addModal.tsx
+"use client";
+import { Modal, Button, TextInput, Select, DatePicker } from '@mantine/core';
+import { useForm } from '@mantine/form';
+import { Task, TaskStatus } from './types';
+import { DateInput } from '@mantine/dates';
 
-export enum TaskStatus {
-  Pending = "pending",
-  Completed = "completed",
-  InProgress = "in_progress"
-}
+import { showNotification } from '@mantine/notifications';
 
 type AddModalProps = {
-  isOpen: boolean;
+  opened: boolean;
   onClose: () => void;
-  onSave: (title: string, description: string, status: TaskStatus, dueDate: Date) => void;
+  onSubmit: (taskData: Omit<Task, 'id'>) => void;
 };
 
-const AddModal: React.FC<AddModalProps> = ({ isOpen, onClose, onSave }) => {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [status, setStatus] = useState<TaskStatus>(TaskStatus.Pending);
-  const [dueDate, setDueDate] = useState<Date | null>(null);
+const AddModal: React.FC<AddModalProps> = ({ opened, onClose, onSubmit }) => {
+  const form = useForm({
+    initialValues: {
+      title: '',
+      description: '',
+      status: TaskStatus.Pending,
+      dueDate: null as Date | null,
+    },
+    validate: {
+      title: (value) => (value.trim() ? null : 'Title is required'),
+      dueDate: (value) => (value ? null : 'Due date is required'),
+    },
+  });
 
-  const handleSave = () => {
-    if (dueDate) {
-      onSave(title, description, status, dueDate);
-      onClose();
+// app/tasks/components/addModal.tsx
+const handleSubmit = (values: typeof form.values) => {
+  try {
+    if (!values.dueDate) {
+      throw new Error("Due date is required");
     }
-  };
-
+    
+    onSubmit({
+      ...values,
+      dueDate: values.dueDate instanceof Date 
+        ? values.dueDate 
+        : new Date(values.dueDate)
+    });
+    
+    form.reset();
+    onClose();
+  } catch (error) {
+    console.error("Submission error:", error);
+    showNotification({
+      title: 'Submission error',
+      message: error.message,
+      color: 'red',
+    });
+  }
+};
   return (
-    <Modal opened={isOpen} onClose={onClose} title="Add New Task">
-      <TextInput
-        label="Title"
-        value={title}
-        onChange={(event) => setTitle(event.currentTarget.value)}
-      />
-      <TextInput
-        label="Description"
-        value={description}
-        onChange={(event) => setDescription(event.currentTarget.value)}
-      />
-      <Select
-        label="Status"
-        value={status}
-        onChange={(value) => setStatus(value as TaskStatus)}
-        data={[
-          { value: TaskStatus.Pending, label: 'Pending' },
-          { value: TaskStatus.Completed, label: 'Completed' },
-          { value: TaskStatus.InProgress, label: 'In Progress' },
-        ]}
-      />
-      <TextInput
-        label="Due Date"
-        type="date"
-        value={dueDate ? dueDate.toISOString().split('T')[0] : ''}
-        onChange={(event) => setDueDate(new Date(event.currentTarget.value))}
-      />
-      <Button onClick={handleSave}>Save</Button>
+    <Modal opened={opened} onClose={onClose} title="Add New Task">
+      <form onSubmit={form.onSubmit(handleSubmit)}>
+        <TextInput
+          label="Title"
+          withAsterisk
+          {...form.getInputProps('title')}
+          mb="sm"
+        />
+        
+        <TextInput
+          label="Description"
+          {...form.getInputProps('description')}
+          mb="sm"
+        />
+        
+        <Select
+          label="Status"
+          data={[
+            { value: TaskStatus.Pending, label: 'Pending' },
+            { value: TaskStatus.Completed, label: 'Completed' },
+            { value: TaskStatus.InProgress, label: 'In Progress' },
+          ]}
+          {...form.getInputProps('status')}
+          mb="sm"
+        />
+        
+        <DateInput
+  label="Due Date"
+  value={form.values.dueDate}
+  onChange={(date) => form.setFieldValue('dueDate', date)}
+  mb="sm"
+  minDate={new Date()}
+/>
+        
+        <Button type="submit" fullWidth>
+          Create Task
+        </Button>
+      </form>
     </Modal>
   );
 };

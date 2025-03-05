@@ -1,58 +1,95 @@
-// app/tasks/components/TaskList.tsx
-import React from 'react';
-import { Button } from '@mantine/core';
-import {Task}  from './types'; 
-
-import { useState } from 'react';
+// app/tasks/components/taskList.tsx
+"use client";
+import { Card, Text, Group, ActionIcon, Badge, Stack } from '@mantine/core';
+import { IconEdit, IconTrash } from '@tabler/icons-react';
 import EditModal from './editModal';
+import { useState } from 'react';
+import { Task, TaskStatus } from './types';
 
-type TaskListProps = {
+export default function TaskList({ tasks, onEdit, onDelete }: {
   tasks: Task[];
-  onDelete: (id: number) => void;
   onEdit: (task: Task) => void;
-};
-
-const TaskList: React.FC<TaskListProps> = ({ tasks, onDelete, onEdit }) => {
+  onDelete: (id: number) => void;
+}) {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC' // Force UTC to match server-rendered format
+    });
+  };
+
   return (
-    <div className="space-y-4">
-      {tasks.map((task) => (
-        <div key={task.id} className="p-4 bg-white rounded shadow">
-          <h2 className="font-bold text-lg">{task.title}</h2>
-          <p className="text-gray-600">{task.description}</p>
-          <div className="flex items-center gap-2 mt-2">
-            <span className={`px-2 py-1 rounded text-sm ${
-              task.status === "completed"? 'bg-green-100 text-green-800' :
-              task.status === "in_progress" ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'
-            }`}>
-              {task.status}
-            </span>
-            <span className="text-sm text-gray-500">
-              Due: {task.dueDate.toLocaleDateString()}
-            </span>
-          </div>
-          <div className="mt-2 flex gap-2">
-            <Button size="sm" onClick={() => onEdit(task)}>Edit</Button>
-            <Button size="sm" color="red" onClick={() => onDelete(task.id)}>
-              Delete
-            </Button>
-          </div>
-        </div>
-      ))}
-      
+    <Stack spacing="sm">
+      {tasks
+        .filter(task => task !== null)
+        .map((task) => (
+          <Card 
+            key={task.id} 
+            shadow="sm" 
+            p="lg" 
+            radius="md" 
+            withBorder
+            data-testid="task-card"
+          >
+            <Group position="apart" mb="xs">
+              <Text weight={500} size="lg">{task.title}</Text>
+              <Group spacing="xs">
+                <ActionIcon
+                  variant="light"
+                  color="blue"
+                  onClick={() => setEditingTask(task)}
+                  aria-label="Edit task"
+                >
+                  <IconEdit size={18} />
+                </ActionIcon>
+                <ActionIcon
+                  variant="light"
+                  color="red"
+                  onClick={() => onDelete(task.id)}
+                  aria-label="Delete task"
+                >
+                  <IconTrash size={18} />
+                </ActionIcon>
+              </Group>
+            </Group>
+
+            {task.description && (
+              <Text size="sm" color="dimmed" mb="xs">
+                {task.description}
+              </Text>
+            )}
+
+            <Group spacing="xl" align="center">
+              <Badge
+                variant="filled"
+                color={
+                  task.status === TaskStatus.Completed ? 'teal' :
+                  task.status === TaskStatus.InProgress ? 'blue' : 'yellow'
+                }
+                size="lg"
+              >
+                {task.status.replace('_', ' ')}
+              </Badge>
+              <Text size="sm" weight={500}>
+                Due: {formatDate(task.dueDate)}
+              </Text>
+            </Group>
+          </Card>
+        ))}
+
       <EditModal
         task={editingTask}
-        isOpen={Boolean(editingTask)}
+        opened={!!editingTask}
         onClose={() => setEditingTask(null)}
-        onSave={(updated) => {
-          onEdit(updated);
+        onSubmit={(editedTask) => {
+          onEdit(editedTask);
           setEditingTask(null);
         }}
       />
-    </div>
+    </Stack>
   );
-};
-
-export default TaskList;
-
+}

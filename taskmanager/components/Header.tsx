@@ -1,15 +1,17 @@
-import React from "react";
+// components/Header.tsx
+import { Text } from '@mantine/core';
 
-// import {Button , Container } from "@mantine/core";
 export default function Header() {
-    return (
-        <header className="w-full bg-purple-500 p-4 ">
-           
-            <h1 className="text-white text-2xl font-bold center">Task Manager</h1>
-           
-        
-
-        </header>
-        
-    );
+  return (
+    <div style={{ 
+      backgroundColor: '#6c5ce7', 
+      padding: '1rem',
+      width: '100%',
+      textAlign: 'center'
+    }}>
+      <Text c="white" fw={700} size="xl">
+        Task Manager
+      </Text>
+    </div>
+  );
 }

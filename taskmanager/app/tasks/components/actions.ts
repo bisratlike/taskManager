@@ -1,50 +1,53 @@
-
+// app/tasks/components/actions.ts
 "use server";
-import {db} from "@/drizzle/db";
-import {tasks} from "@/drizzle/schema";
+import { db } from "@/drizzle/db";
+import { tasks } from "@/drizzle/schema";
 import { eq, asc } from "drizzle-orm";
-// import { sql } from "drizzle-orm";
+import { Task} from './types';
 
+export async function createTask(taskData: Omit<Task, 'id'>) {
+  try {
+      const dueDate = taskData.dueDate instanceof Date 
+          ? taskData.dueDate 
+          : new Date(taskData.dueDate);
+      console.log("Task Data:", taskData);
+      console.log("Due Date:", dueDate);
 
-export async function createTask(title: string, description: string, dueDate: Date, status: "pending" | "completed" | "in_progress" = "pending") {
+      const [newTask] = await db.insert(tasks).values({
+          title: taskData.title,
+          description: taskData.description,
+          dueDate: dueDate,
+          status: taskData.status,
+      }).returning();
 
-    try{
-
-        const [newTask]= await db.insert(tasks).values({
-            title,
-            description,
-            dueDate,
-            status, 
-        }).returning();
-        return newTask;
-      
-    
-
-    }catch(error){
-
-    console.log("error on creating task",error)
-    }
-
+      console.log("New Task:", newTask);
+      return newTask;
+  } catch (error) {
+      console.error("Error creating task:", error);
+      throw new Error("Failed to create task");
+  }
 }
 
-export async function updateTask(id: number, title: string, description: string, dueDate: Date, status: "pending" | "completed" | "in_progress") {
+export async function updateTask(task: Task) {
+  try {
+    const [updatedTask] = await db.update(tasks)
+      .set({
+        title: task.title,
+        description: task.description,
+        dueDate: task.dueDate,
+        status: task.status,
+      })
+      .where(eq(tasks.id, task.id))
+      .returning();
 
-    try{
-
-        const [updatedTask]= await db.update(tasks).set({
-            title,
-            description,
-            dueDate,
-            status
-        }).where(eq(tasks.id, id)).returning();
-
-        return updatedTask;
-
-    }catch(error){
-
-        console.log("error on updating task",error)
-    }
+    return updatedTask;
+  } catch (error) {
+    console.error("Error updating task:", error);
+    throw new Error("Failed to update task");
+  }
 }
+
+
 
 export async function deleteTask(id: number) {
     try{
@@ -59,15 +62,13 @@ export async function deleteTask(id: number) {
 }
 
 
+// app/tasks/components/actions.ts
 export async function getTasks() {
-    try{
-
-        const allTasks = await db.select().from(tasks).orderBy(asc(tasks.id));
-       
-        return allTasks|| []; ;
-
-    }catch(error){
-
-        console.log("error on getting tasks",error)
+    try {
+      const allTasks = await db.select().from(tasks).orderBy(asc(tasks.id));
+      return allTasks || [];
+    } catch (error) {
+      console.log("error on getting tasks", error);
+      return [];
     }
-}
+  }
